@@ -1,0 +1,19 @@
+[project]
+name = "alt-text-optimizer"
+version = "0.1.0"
+description = "Write image alt text, score it against the image with a multimodal embedding, rewrite until it matches"
+requires-python = ">=3.12,<3.13"
+dependencies = ["pillow>=11"]
+
+[project.optional-dependencies]
+# Local SigLIP 2 scorer (free fallback). Large download.
+local = ["torch>=2.5", "transformers>=4.49", "sentencepiece>=0.2", "protobuf>=5"]
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+pythonpath = ["."]

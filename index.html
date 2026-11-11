@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Alt Text Optimizer</title>
+<style>
+  :root {
+    --bg: #f6f7f5; --panel: #fff; --ink: #1d231f; --muted: #6b746e; --line: #e3e7e3;
+    --green: #2f7d32; --green-soft: #e8f3e8; --amber: #b26a00; --amber-soft: #fff4e0;
+    --red: #b3261e; --red-soft: #fdecea; --bar: #c9d3cc;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--ink); }
+  header { padding: 16px 20px 12px; border-bottom: 1px solid var(--line); background: var(--panel); }
+  h1 { margin: 0 0 2px; font-size: 20px; }
+  .sub { color: var(--muted); margin: 0; }
+  .stats { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .stat { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; min-width: 120px; }
+  .stat b { display: block; font-size: 17px; }
+  .stat span { color: var(--muted); font-size: 12px; }
+  .warn { margin-top: 10px; padding: 8px 10px; border-radius: 8px; background: var(--amber-soft); color: var(--amber); font-size: 13px; }
+  main { display: grid; grid-template-columns: 320px 1fr; min-height: calc(100vh - 140px); }
+  aside { border-right: 1px solid var(--line); background: var(--panel); overflow-y: auto; max-height: calc(100vh - 140px); }
+  .item { display: grid; grid-template-columns: 48px 1fr auto; gap: 10px; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--line); cursor: pointer; }
+  .item:hover, .item.on { background: var(--green-soft); }
+  .item img { width: 48px; height: 48px; object-fit: cover; border-radius: 6px; }
+  .item .n { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .item .m { color: var(--muted); font-size: 12px; }
+  .tag { font-size: 11px; padding: 1px 6px; border-radius: 10px; background: var(--bg); border: 1px solid var(--line); color: var(--muted); }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--line); }
+  .dot.accurate { background: var(--green); } .dot.minor { background: var(--amber); } .dot.wrong { background: var(--red); }
+  section.detail { padding: 18px 22px; overflow-y: auto; max-height: calc(100vh - 140px); }
+  .top { display: grid; grid-template-columns: 220px 1fr 1fr; gap: 14px; align-items: start; }
+  .top img { width: 220px; height: 220px; object-fit: cover; border-radius: 10px; border: 1px solid var(--line); }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; min-height: 120px; }
+  .card.after { background: var(--green-soft); border-color: #b9dab9; }
+  .card h3 { margin: 0 0 6px; font-size: 11px; letter-spacing: .06em; color: var(--muted); text-transform: uppercase; display: flex; justify-content: space-between; }
+  .card p { margin: 0; }
+  .bars { margin: 16px 0 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+  .bar { display: grid; grid-template-columns: 60px 1fr 60px; align-items: center; gap: 10px; margin: 4px 0; font-size: 12px; color: var(--muted); }
+  .bar div { height: 10px; border-radius: 5px; background: var(--line); overflow: hidden; }
+  .bar i { display: block; height: 100%; background: var(--bar); }
+  .bar.after i { background: var(--green); }
+  .delta { color: var(--green); font-weight: 600; font-size: 13px; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 12px 0; }
+  button, select, input { font: inherit; border: 1px solid var(--line); border-radius: 7px; padding: 6px 10px; background: var(--panel); color: var(--ink); }
+  button { cursor: pointer; }
+  button.primary { background: var(--green); border-color: var(--green); color: #fff; }
+  button.v.accurate.on { background: var(--green); color: #fff; } button.v.minor.on { background: var(--amber); color: #fff; } button.v.wrong.on { background: var(--red); color: #fff; }
+  input.note { flex: 1; min-width: 200px; }
+  svg { width: 100%; height: 150px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
+  table { width: 100%; border-collapse: collapse; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; margin-top: 12px; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+  tr.best td { background: var(--green-soft); }
+  tr.orig td { color: var(--muted); }
+  td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .box { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-top: 12px; }
+  .box h4 { margin: 0 0 6px; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+  .muted { color: var(--muted); }
+  a { color: var(--green); }
+  @media (max-width: 900px) {
+    main { grid-template-columns: 1fr; }
+    aside { max-height: 260px; }
+    .top { grid-template-columns: 1fr; }
+    .top img { width: 100%; height: auto; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Alt Text Optimizer</h1>
+  <p class="sub">A vision call writes a description and first drafts; each rewrite round looks at the photo again, until Google's gemini-embedding-2 match hits the target. Match is shown 0 to 100% (raw cosine in the step table). Rate each winner for factual accuracy.</p>
+  <div class="stats" id="stats"></div>
+  <div class="warn" id="warn" hidden></div>
+</header>
+<main>
+  <aside id="list"></aside>
+  <section class="detail" id="detail"><p class="muted">Pick a product.</p></section>
+</main>
+<script>
+let S = null, cur = null, subsetOnly = true;
+const shown = () => subsetOnly ? S.products.filter(p => S.subset.includes(p.id)) : S.products;
+// Raw cosine -> 0-100% match (fit lives in optimizer.py: SCALE_A, SCALE_B)
+const scale = x => Math.max(0, Math.min(100, S.scale.a + S.scale.b * x));
+const pct = x => scale(x).toFixed(1) + "%";
+const pts = (a, b) => { const d = scale(b) - scale(a); return (d >= 0 ? "+" : "") + d.toFixed(1); };
+const frac = x => (x * 100).toFixed(0) + "%";
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+async function load() {
+  S = await (await fetch("/api/state")).json();
+  renderStats(); renderList();
+  if (cur == null || !shown().some(p => p.id === cur)) cur = shown().length ? shown()[0].id : null;
+  if (cur != null) renderDetail(cur);
+}
+
+function renderStats() {
+  const ids = new Set(shown().map(p => p.id));
+  const rs = Object.values(S.results).filter(r => ids.has(r.id));
+  const n = rs.length, avg = f => n ? rs.reduce((a, r) => a + f(r), 0) / n : 0;
+  const rt = Object.entries(S.ratings).filter(([k]) => ids.has(+k)).map(([, v]) => v);
+  const cnt = v => rt.filter(r => r.verdict === v).length;
+  const per = avg(r => r.cost_usd);
+  const scorers = [...new Set(rs.map(r => r.options.scorer))];
+  const cards = [
+    [`${n} / ${ids.size}`, subsetOnly ? "quick run" : "images run"],
+    [n ? `${pct(avg(r => r.before.match))} → ${pct(avg(r => r.best.match))}` : "–", "avg match before → after"],
+    [n ? frac(avg(r => r.best.match >= S.defaults.target ? 1 : 0)) : "–", `reach ${pct(S.defaults.target)} target`],
+    [n ? avg(r => r.rewrite_rounds).toFixed(2) : "–", "avg text-only rounds"],
+    [n ? `${rs.filter(r => r.kept_original).length}` : "–", "kept current alt"],
+    [n ? "$" + per.toFixed(5) : "–", "avg writer cost / image"],
+    [n ? "$" + (per * 10000).toFixed(2) : "–", "projected per 10,000 images"],
+    [rt.length ? `${cnt("accurate")} ✓ · ${cnt("minor")} ~ · ${cnt("wrong")} ✗` : "–", "human accuracy check"],
+  ];
+  document.getElementById("stats").innerHTML = cards.map(([b, s]) => `<div class="stat"><b>${b}</b><span>${s}</span></div>`).join("");
+  const w = document.getElementById("warn");
+  if (scorers.includes("siglip")) {
+    w.hidden = false;
+    w.textContent = "Some results were scored with the local SigLIP fallback. Its match % is not comparable to Google's gemini-embedding-2. Re-run those with the gemini scorer before judging the target.";
+  } else w.hidden = true;
+}
+
+function renderList() {
+  const toggle = `<label class="item" style="grid-template-columns:auto 1fr;cursor:pointer"><input type="checkbox" ${subsetOnly ? "checked" : ""} onchange="subsetOnly=this.checked;load()"> <span>Quick-run products only (${S.subset.length} products)</span></label>`;
+  document.getElementById("list").innerHTML = toggle + shown().map(p => {
+    const r = S.results[p.id], rt = S.ratings[p.id];
+    const m = r ? `${pct(r.before.match)} → <b>${pct(r.best.match)}</b>` : "not run";
+    return `<div class="item ${p.id === cur ? "on" : ""}" onclick="pick('${p.id}')">
+      <img src="data/${p.image_file}" alt="" loading="lazy">
+      <div><div class="n">${esc(p.name)}</div><div class="m">${m} ${p.alt_kind ? `<span class="tag">${p.alt_kind}</span>` : ""}</div></div>
+      <span class="dot ${rt ? rt.verdict : ""}" title="${rt ? rt.verdict : "not rated"}"></span></div>`;
+  }).join("");
+}
+
+function pick(id) { cur = id; renderList(); renderDetail(id); }
+
+function chart(steps) {
+  const W = 800, H = 150, P = 28;
+  const ys = steps.map(s => s.match), lo = Math.min(...ys) - 0.02, hi = Math.max(...ys, S.defaults.target) + 0.02;
+  const x = i => P + (i * (W - 2 * P)) / Math.max(1, steps.length - 1);
+  const y = v => H - P + 8 - ((v - lo) / (hi - lo)) * (H - 2 * P);
+  let best = -1, line = "";
+  steps.forEach((s, i) => { best = Math.max(best, s.match); line += `${i ? "L" : "M"}${x(i)},${y(best)}`; });
+  const dots = steps.map((s, i) => `<circle cx="${x(i)}" cy="${y(s.match)}" r="3.5" fill="${s.step === 0 ? "#9aa49d" : "#2f7d32"}" opacity=".55"><title>step ${s.step}: ${pct(s.match)}</title></circle>`).join("");
+  const t = (S.results[cur]?.options.target) ?? S.defaults.target;
+  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Match by step">
+    <line x1="${P}" x2="${W - P}" y1="${y(t)}" y2="${y(t)}" stroke="#b26a00" stroke-dasharray="4 4"/>
+    <text x="${W - P}" y="${y(t) - 4}" text-anchor="end" font-size="11" fill="#b26a00">target ${pct(t)}</text>
+    <path d="${line}" fill="none" stroke="#2f7d32" stroke-width="2"/>${dots}
+    <text x="${P}" y="${H - 6}" font-size="11" fill="#6b746e">step 0</text>
+    <text x="${W - P}" y="${H - 6}" font-size="11" fill="#6b746e" text-anchor="end">step ${steps.length - 1}</text></svg>`;
+}
+
+function writerTable(id) {
+  const rows = Object.entries(S.experiments || {}).filter(([, m]) => m[id]).map(([w, m]) => [w, m[id]]);
+  if (!rows.length) return "";
+  rows.sort((a, b) => b[1].best - a[1].best);
+  return `<div class="box"><h4>Writer comparison (same 5 products, same scorer)</h4><table style="margin:0"><thead><tr><th>Writer</th><th>Best</th><th>Cost / image</th><th>Seconds</th><th>Winning alt text</th></tr></thead><tbody>
+    ${rows.map(([w, x], i) => `<tr class="${i === 0 ? "best" : ""}"><td>${esc(w)}</td><td class="num">${pct(x.best)} <span class="muted">${x.best.toFixed(3)}</span></td><td class="num">$${x.cost.toFixed(5)}</td><td class="num">${x.seconds}</td><td>${x.kept ? '<span class="muted">(kept current alt)</span> ' : ""}${esc(x.text)}</td></tr>`).join("")}
+  </tbody></table></div>`;
+}
+
+function renderDetail(id) {
+  const p = S.products.find(q => q.id === id), r = S.results[id], rt = S.ratings[id] || {};
+  const d = S.defaults, o = r ? r.options : d;
+  const opt = (list, v) => list.map(x => `<option ${x === v ? "selected" : ""}>${x}</option>`).join("");
+  const controls = `<div class="row">
+      <select id="writer">${opt(S.writers, o.writer)}</select>
+      <select id="scorer">${opt(S.scorers, o.scorer)}</select>
+      <label class="muted">target % <input id="target" type="number" step="1" min="0" max="100" value="${scale(o.target).toFixed(0)}" style="width:70px"></label>
+      <button class="primary" id="runbtn" onclick="run('${id}')">${r ? "Re-run" : "Run"}</button>
+      <span class="muted" id="runmsg"></span></div>`;
+  let html = `<div class="top">
+      <img src="data/${p.image_file}" alt="${esc(p.name)}">
+      <div class="card"><h3><span>Before · ${r ? pct(r.before.match) : "–"}</span>${p.alt_kind ? `<span class="tag">${p.alt_kind}</span>` : ""}</h3><p>${esc(p.current_alt) || '<span class="muted">(empty)</span>'}</p></div>
+      <div class="card after"><h3><span>${r && r.kept_original ? "Keep current" : "After"} · ${r ? pct(r.best.match) : "–"}</span>${r ? `<button onclick="navigator.clipboard.writeText(${esc(JSON.stringify(r.best.text))})">Copy</button>` : ""}</h3><p>${r ? esc(r.best.text) : '<span class="muted">Not run yet.</span>'}</p></div>
+    </div>
+    <p class="muted" style="margin:8px 0 0">${esc(p.name)}${p.url ? ` · <a href="${p.url}" target="_blank" rel="noopener">${p.url}</a>` : ""}</p>${controls}`;
+  if (r) {
+    const sorted = [...r.steps].sort((a, b) => b.match - a.match);
+    html += `<div class="bars">
+        <div class="bar"><span>BEFORE</span><div><i style="width:${scale(r.before.match)}%"></i></div><span>${pct(r.before.match)}</span></div>
+        <div class="bar after"><span>AFTER</span><div><i style="width:${scale(r.best.match)}%"></i></div><span>${pct(r.best.match)}</span></div>
+        <div class="delta">${pts(r.before.match, r.best.match)} points (raw ${r.before.match.toFixed(3)} → ${r.best.match.toFixed(3)}) · ${r.already_met ? `current alt already met the target, ran ${r.usage.calls} fixed writer calls${r.kept_original ? ", nothing beat it" : ""}` : r.kept_original ? "nothing beat the current alt" : r.reached_target ? "reached target" : "stopped at round cap"} · ${r.rewrite_rounds} text-only round(s) · ${r.usage.calls} writer calls · ${r.usage.input + r.usage.output} tokens · $${r.cost_usd.toFixed(5)} · ${r.seconds}s</div>
+        <div class="muted" style="font-size:12px">writer ${esc(r.options.writer)} · scorer ${esc(r.options.scorer)} (${esc(r.scorer_model)}) · ${esc(r.ran_at)}</div></div>
+      ${chart(r.steps)}
+      <div class="box"><h4>Accuracy check (does the winner say anything false about the photo?)</h4>
+        <div class="row" style="margin:0">
+          ${["accurate", "minor", "wrong"].map(v => `<button class="v ${v} ${rt.verdict === v ? "on" : ""}" onclick="rate('${id}','${v}')">${{accurate: "Accurate", minor: "Minor issue", wrong: "Wrong fact"}[v]}</button>`).join("")}
+          <input class="note" id="note" placeholder="What is wrong? e.g. says roses, they are carnations" value="${esc(rt.note || "")}">
+          <button onclick="rate('${id}')">Save note</button></div></div>
+      ${writerTable(id)}
+      <div class="box"><h4>What the vision call saw (the only truth the rewrite rounds get)</h4><p style="margin:0">${esc(r.description)}</p></div>
+      <table><thead><tr><th>#</th><th>Match</th><th>Raw</th><th>Alt text</th><th>Round</th><th>Step</th><th>Chars</th></tr></thead><tbody>
+      ${sorted.map((s, i) => `<tr class="${s === r.best ? "best" : ""} ${s.step === 0 ? "orig" : ""}"><td class="num">${i + 1}</td><td class="num">${pct(s.match)}</td><td class="num muted">${s.match.toFixed(3)}</td><td>${esc(s.text) || "(empty)"}</td><td>${esc(s.round)}</td><td class="num">${s.step}</td><td class="num">${s.chars ?? (s.text || "").length}</td></tr>`).join("")}
+      </tbody></table>`;
+  }
+  html += `<div class="box"><h4>Product copy passed to the vision call</h4><p class="muted" style="margin:0;font-size:12px">${esc(p.copy)}</p></div>`;
+  document.getElementById("detail").innerHTML = html;
+}
+
+async function run(id) {
+  const btn = document.getElementById("runbtn"), msg = document.getElementById("runmsg");
+  btn.disabled = true; msg.textContent = "running…";
+  const body = { id, writer: writer.value, scorer: scorer.value, target: (parseFloat(target.value) - S.scale.a) / S.scale.b };
+  const res = await (await fetch("/api/run", { method: "POST", body: JSON.stringify(body) })).json();
+  if (res.error) { msg.textContent = res.error; btn.disabled = false; return; }
+  await load();
+}
+
+async function rate(id, verdict) {
+  verdict = verdict || (S.ratings[id] || {}).verdict;
+  if (!verdict) return;
+  await fetch("/api/rate", { method: "POST", body: JSON.stringify({ id, verdict, note: document.getElementById("note").value }) });
+  await load();
+}
+
+load();
+</script>
+</body>
+</html>
